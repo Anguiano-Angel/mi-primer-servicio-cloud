@@ -1,32 +1,32 @@
 const express = require("express");
 const cors = require("cors");
+const axios = require("axios");
+const csv = require("csvtojson");
 
 const app = express();
-
 app.use(cors());
 app.use(express.json());
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
-// Endpoint raíz
+// Reemplaza esta URL con el enlace CSV de Google Sheets
+const GOOGLE_SHEETS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTAEitsnT8EYA3BjWT5dlSErNwuObdrKbuXAob0UyxBMDYAE6D3SUk9P-7YnXTmcVyquAP3guJRW2Xx/pub?output=csv";
+
 app.get("/", (req, res) => {
-    res.json({
-        mensaje: "Mi primer servicio Cloud",
-        estado: "Online",
-        tecnologia: "Node.js + Express"
-    });
+    res.json({ mensaje: "API Backend ejecutándose en la nube", estado: "Online" });
 });
 
-// Endpoint de productos (Parte 6 de la guía)
-app.get("/api/productos", (req, res) => {
-    const productos = [
-        { id: 1, nombre: "Laptop", precio: 15000, categoria: "Computadoras" },
-        { id: 2, nombre: "Mouse", precio: 350, categoria: "Accesorios" },
-        { id: 3, nombre: "Teclado", precio: 700, categoria: "Accesorios" }
-    ];
-    res.json(productos);
+app.get("/api/productos", async (req, res) => {
+    try {
+        const response = await axios.get(GOOGLE_SHEETS_CSV_URL);
+        const jsonArray = await csv().fromString(response.data);
+        res.json(jsonArray);
+    } catch (error) {
+        console.error("Error leyendo Google Sheets:", error);
+        res.status(500).json({ error: "Error al obtener datos de Google Sheets" });
+    }
 });
 
 app.listen(PORT, () => {
-    console.log("Servidor ejecutandose en puerto " + PORT);
+    console.log(`Servidor activo en puerto ${PORT}`);
 });
