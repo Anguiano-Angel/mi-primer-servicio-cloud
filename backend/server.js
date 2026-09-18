@@ -19,8 +19,24 @@ app.get("/", (req, res) => {
 app.get("/api/productos", async (req, res) => {
     try {
         const response = await axios.get(GOOGLE_SHEETS_CSV_URL);
-        const jsonArray = await csv().fromString(response.data);
-        res.json(jsonArray);
+
+        // Parseamos el CSV omitiendo columnas vacías y limpiando la estructura
+        const rawData = await csv({ noheader: true }).fromString(response.data);
+
+        // La fila 0 contiene los encabezados reales ("ID", "Nombre", "Precio", "Categoría")
+        const headers = Object.values(rawData[0]).filter(Boolean);
+
+        // Mapeamos las filas siguientes usando los encabezados reales
+        const productos = rawData.slice(1).map((row) => {
+            const values = Object.values(row).filter(Boolean);
+            const item = {};
+            headers.forEach((header, index) => {
+                item[header] = values[index] || "";
+            });
+            return item;
+        });
+
+        res.json(productos);
     } catch (error) {
         console.error("Error leyendo Google Sheets:", error);
         res.status(500).json({ error: "Error al obtener datos de Google Sheets" });
