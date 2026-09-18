@@ -2,31 +2,64 @@ import { useEffect, useState } from "react";
 
 function App() {
   const [productos, setProductos] = useState([]);
+  const [estadoServicio, setEstadoServicio] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(false);
 
+  // Estados para Reto 1 y Reto 2
+  const [busqueda, setBusqueda] = useState("");
+  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState("Todas");
+
   useEffect(() => {
-    fetch("https://mi-primer-servicio-cloud-bhn7.onrender.com/api/productos")
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error("Error en el servidor");
-        }
-        return response.json();
-      })
-      .then((data) => {
-        if (Array.isArray(data)) {
-          setProductos(data);
+    const API_URL = "https://mi-primer-servicio-cloud-bhn7.onrender.com";
+
+    // Petición de Productos
+    const fetchProductos = fetch(`${API_URL}/api/productos`).then((res) => {
+      if (!res.ok) throw new Error("Error obteniendo productos");
+      return res.json();
+    });
+
+    // Petición del Estado (Reto 3)
+    const fetchEstado = fetch(`${API_URL}/api/estado`).then((res) => {
+      if (!res.ok) throw new Error("Error obteniendo estado");
+      return res.json();
+    });
+
+    Promise.all([fetchProductos, fetchEstado])
+      .then(([dataProductos, dataEstado]) => {
+        if (Array.isArray(dataProductos)) {
+          setProductos(dataProductos);
         } else {
           setProductos([]);
         }
+        setEstadoServicio(dataEstado);
         setCargando(false);
       })
-      .catch((error) => {
-        console.error("Error al obtener productos:", error);
+      .catch((err) => {
+        console.error("Error al cargar datos del servicio:", err);
         setError(true);
         setCargando(false);
       });
   }, []);
+
+  // Extraer lista única de categorías para el filtro (Reto 2)
+  const categorias = [
+    "Todas",
+    ...new Set(productos.map((p) => p.categoria).filter(Boolean))
+  ];
+
+  // Filtrado dinámico por nombre (Reto 1) y categoría (Reto 2)
+  const productosFiltrados = productos.filter((producto) => {
+    const coincideNombre = producto.nombre
+      .toLowerCase()
+      .includes(busqueda.toLowerCase());
+
+    const coincideCategoria =
+      categoriaSeleccionada === "Todas" ||
+      producto.categoria.toLowerCase() === categoriaSeleccionada.toLowerCase();
+
+    return coincideNombre && coincideCategoria;
+  });
 
   return (
     <div style={styles.container}>
@@ -37,13 +70,57 @@ function App() {
         <p style={styles.subtitle}>
           Catálogo dinámico consumiendo datos de <strong>Google Sheets</strong> a través de una API en <strong>Node.js (Render)</strong>.
         </p>
+
+        {/* Reto 3: Muestra del Estado del Servicio */}
+        {estadoServicio && (
+          <div style={styles.statusBadgeContainer}>
+            <span style={styles.statusDot}>●</span>
+            <span>
+              <strong>Estado:</strong> {estadoServicio.estado} |
+              <strong> Servidor:</strong> {estadoServicio.servidor} |
+              <strong> Servicio:</strong> {estadoServicio.servicio} v{estadoServicio.version}
+            </span>
+          </div>
+        )}
       </header>
+
+      {/* Panel de Filtros: Reto 1 y Reto 2 */}
+      {!cargando && !error && (
+        <section style={styles.filterSection}>
+          {/* Reto 1: Buscador por Nombre */}
+          <div style={styles.inputGroup}>
+            <label style={styles.label}>🔍 Buscar producto:</label>
+            <input
+              type="text"
+              placeholder="Escribe un nombre..."
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              style={styles.input}
+            />
+          </div>
+
+          {/* Reto 2: Selector de Categoría */}
+          <div style={styles.inputGroup}>
+            <label style={styles.label}>🏷️ Categoría:</label>
+            <select
+              value={categoriaSeleccionada}
+              onChange={(e) => setCategoriaSeleccionada(e.target.value)}
+              style={styles.select}
+            >
+              {categorias.map((cat, index) => (
+                <option key={index} value={cat}>
+                  {cat === "Todas" ? "Todas las categorías" : cat}
+                </option>
+              ))}
+            </select>
+          </div>
+        </section>
+      )}
 
       {/* Estados de Carga y Error */}
       {cargando && (
         <div style={styles.statusBox}>
-          <div style={styles.spinner}></div>
-          <p>Cargando catálogo en tiempo real...</p>
+          <p>Cargando información y estado del servicio...</p>
         </div>
       )}
 
@@ -53,31 +130,35 @@ function App() {
         </div>
       )}
 
-      {/* Cuadrícula de Productos */}
+      {/* Lista de Productos */}
       {!cargando && !error && (
         <main style={styles.grid}>
-          {productos.map((producto, index) => (
-            <div key={producto.id || index} style={styles.card}>
-              <div style={styles.cardHeader}>
-                <span style={styles.categoryBadge}>{producto.categoria}</span>
-                <span style={styles.idBadge}>#{producto.id || index + 1}</span>
-              </div>
+          {productosFiltrados.length > 0 ? (
+            productosFiltrados.map((producto, index) => (
+              <div key={producto.id || index} style={styles.card}>
+                <div style={styles.cardHeader}>
+                  <span style={styles.categoryBadge}>{producto.categoria}</span>
+                  <span style={styles.idBadge}>#{producto.id || index + 1}</span>
+                </div>
 
-              <h3 style={styles.productName}>{producto.nombre}</h3>
+                <h3 style={styles.productName}>{producto.nombre}</h3>
 
-              <div style={styles.cardFooter}>
-                <span style={styles.priceLabel}>Precio</span>
-                <span style={styles.priceValue}>${producto.precio}</span>
+                <div style={styles.cardFooter}>
+                  <span style={styles.priceLabel}>Precio</span>
+                  <span style={styles.priceValue}>${producto.precio}</span>
+                </div>
               </div>
-            </div>
-          ))}
+            ))
+          ) : (
+            <p style={styles.noResults}>No se encontraron productos que coincidan con la búsqueda.</p>
+          )}
         </main>
       )}
     </div>
   );
 }
 
-// Estilos en línea para un acabado limpio y moderno
+// Estilos de la Interfaz
 const styles = {
   container: {
     minHeight: "100vh",
@@ -90,7 +171,7 @@ const styles = {
   header: {
     textAlign: "center",
     maxWidth: "800px",
-    margin: "0 auto 40px auto",
+    margin: "0 auto 30px auto",
   },
   badgeCloud: {
     display: "inline-block",
@@ -112,9 +193,67 @@ const styles = {
     WebkitTextFillColor: "transparent",
   },
   subtitle: {
-    fontSize: "1.1rem",
+    fontSize: "1.05rem",
     color: "#94a3b8",
     lineHeight: "1.6",
+    marginBottom: "16px",
+  },
+  statusBadgeContainer: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "8px",
+    backgroundColor: "#1e293b",
+    border: "1px solid #334155",
+    padding: "8px 16px",
+    borderRadius: "12px",
+    fontSize: "13px",
+    color: "#cbd5e1",
+  },
+  statusDot: {
+    color: "#34d399",
+    fontSize: "16px",
+  },
+  filterSection: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "20px",
+    justifyContent: "center",
+    maxWidth: "800px",
+    margin: "0 auto 32px auto",
+    backgroundColor: "#1e293b",
+    padding: "20px",
+    borderRadius: "16px",
+    border: "1px solid #334155",
+  },
+  inputGroup: {
+    display: "flex",
+    flexDirection: "column",
+    flex: "1 1 250px",
+    gap: "6px",
+  },
+  label: {
+    fontSize: "14px",
+    fontWeight: "600",
+    color: "#cbd5e1",
+  },
+  input: {
+    backgroundColor: "#0f172a",
+    border: "1px solid #475569",
+    borderRadius: "8px",
+    padding: "10px 14px",
+    color: "#f8fafc",
+    fontSize: "14px",
+    outline: "none",
+  },
+  select: {
+    backgroundColor: "#0f172a",
+    border: "1px solid #475569",
+    borderRadius: "8px",
+    padding: "10px 14px",
+    color: "#f8fafc",
+    fontSize: "14px",
+    outline: "none",
+    cursor: "pointer",
   },
   grid: {
     display: "grid",
@@ -132,7 +271,6 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     justifyContent: "space-between",
-    transition: "transform 0.2s ease, border-color 0.2s ease",
   },
   cardHeader: {
     display: "flex",
@@ -148,7 +286,6 @@ const styles = {
     fontSize: "12px",
     fontWeight: "600",
     textTransform: "uppercase",
-    letterSpacing: "0.5px",
   },
   idBadge: {
     color: "#64748b",
@@ -176,6 +313,12 @@ const styles = {
     fontSize: "1.5rem",
     fontWeight: "800",
     color: "#34d399",
+  },
+  noResults: {
+    gridColumn: "1 / -1",
+    textAlign: "center",
+    color: "#94a3b8",
+    padding: "40px",
   },
   statusBox: {
     textAlign: "center",
