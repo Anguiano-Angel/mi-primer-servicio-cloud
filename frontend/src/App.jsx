@@ -6,7 +6,8 @@ function App() {
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    fetch("https://mi-primer-servicio-cloud-bhn7.onrender.com")
+    // Añadimos /api/productos a la URL del backend
+    fetch("https://mi-primer-servicio-cloud-bhn7.onrender.com/api/productos")
       .then((response) => {
         if (!response.ok) {
           throw new Error("Error en el servidor");
@@ -14,11 +15,15 @@ function App() {
         return response.json();
       })
       .then((data) => {
-        setProductos(data);
+        if (Array.isArray(data)) {
+          setProductos(data);
+        } else {
+          setProductos([]);
+        }
         setCargando(false);
       })
       .catch((error) => {
-        console.error(error);
+        console.error("Error al obtener productos:", error);
         setError(true);
         setCargando(false);
       });
@@ -35,9 +40,9 @@ function App() {
 
       {!cargando &&
         !error &&
-        productos.map((producto) => (
+        productos.map((producto, index) => (
           <div
-            key={producto.id}
+            key={producto.id || index}
             style={{
               border: "1px solid gray",
               padding: "15px",
